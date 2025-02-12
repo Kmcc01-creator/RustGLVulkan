@@ -1,0 +1,56 @@
+# Cargo.toml
+[package]
+name = "gl_engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "OpenGL-based graphics engine with Linux compositor support"
+
+[dependencies]
+# Window and Graphics
+winit = "0.28"
+raw-window-handle = "0.5"
+gl = "0.14"
+glutin = "0.30"
+
+#for diff editing tool 
+git2 = "0.18"
+similar = "2.4"
+colored = "2.1"
+walkdir = "2.4"
+
+# Math and Graph Libraries
+petgraph = "0.6"
+nalgebra = "0.32"
+ndarray = { version = "0.15", optional = true }
+
+# Platform Specific
+x11 = { version = "2.21", features = ["xlib"] }
+xcb = "1.2"
+wayland-client = "0.30"
+
+# Utility
+log = "0.4"
+env_logger = "0.10"
+thiserror = "1.0"
+parking_lot = "0.12"
+
+[features]
+default = ["x11"]
+x11 = ["winit/x11", "glutin/x11"]
+wayland = ["winit/wayland", "glutin/wayland"]
+compositor = []
+
+[dev-dependencies]
+criterion = "0.4"
+mockall = "0.11"
+
+[[bin]]
+name = "print_directory"
+path = "tools/print_directory.rs"
+[[bin]]
+name = "generate_file"
+path = "tools/generate_file.rs"
+[[bin]]
+name = "generate_module"
+path = "tools/generate_module.rs"

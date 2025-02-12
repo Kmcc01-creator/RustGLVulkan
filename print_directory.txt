@@ -1,0 +1,157 @@
+rustgl
+├── Cargo.lock
+├── Cargo.toml
+├── LICENSE
+├── README.md
+├── assets
+│   ├── shaders
+│   └── textures
+├── benches
+│   └── renderer_bench.rs
+├── dir_structure.txt
+├── docs
+│   ├── API.md
+│   ├── ARCHITECTURE.md
+│   ├── COMPOSITOR_NOTES.md
+│   ├── EFFECTS.md
+│   ├── MEMORY_DEBUG.md
+│   ├── OPENGL_FEATURES.md
+│   ├── PROJECT_NOTES.md
+│   ├── SOURCE1.md
+│   └── scripts
+│       └── s1.md
+├── examples
+│   ├── basic_window.rs
+│   ├── blur_effect.rs
+│   ├── custom_decoration.rs
+│   └── scene_graph.rs
+├── print_directory.txt
+├── src
+│   ├── compositor
+│   │   ├── effects
+│   │   │   ├── animation.rs
+│   │   │   ├── blur.rs
+│   │   │   ├── mod.rs
+│   │   │   ├── shadow.rs
+│   │   │   └── transparency.rs
+│   │   ├── kwin.rs
+│   │   ├── managers
+│   │   │   ├── mod.rs
+│   │   │   └── window.rs
+│   │   ├── mod.rs
+│   │   ├── mutter.rs
+│   │   └── picom.rs
+│   ├── debug
+│   │   ├── memory.rs
+│   │   ├── memory_tracker.rs
+│   │   ├── mod.rs
+│   │   ├── trace.rs
+│   │   └── visualization
+│   │       ├── layout.rs
+│   │       ├── mod.rs
+│   │       ├── palette.rs
+│   │       ├── renderer.rs
+│   │       └── widgets.rs
+│   ├── engine.rs
+│   ├── graph.rs
+│   ├── graphics
+│   │   ├── backends
+│   │   │   ├── opengl
+│   │   │   │   ├── backend.rs
+│   │   │   │   ├── buffer.rs
+│   │   │   │   ├── context.rs
+│   │   │   │   ├── memory.rs
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── pipeline.rs
+│   │   │   │   ├── shader.rs
+│   │   │   │   ├── types.rs
+│   │   │   │   └── uniform.rs
+│   │   │   └── vulkan
+│   │   │       └── memory.rs
+│   │   ├── buffer.rs
+│   │   ├── command
+│   │   │   └── mod.rs
+│   │   ├── context.rs
+│   │   ├── core
+│   │   │   └── mod.rs
+│   │   ├── memory.rs
+│   │   ├── mod.rs
+│   │   ├── pipeline
+│   │   │   └── state.rs
+│   │   ├── renderer
+│   │   │   ├── mod.rs
+│   │   │   └── pipeline.rs
+│   │   ├── renderer.rs
+│   │   ├── resources
+│   │   │   └── mod.rs
+│   │   ├── shader
+│   │   │   ├── mod.rs
+│   │   │   └── program.rs
+│   │   ├── shader.rs
+│   │   └── texture.rs
+│   ├── gui
+│   │   ├── element.rs
+│   │   ├── mod.rs
+│   │   └── widgets
+│   │       ├── button.rs
+│   │       └── panel.rs
+│   ├── input
+│   │   ├── gamepad.rs
+│   │   ├── keyboard.rs
+│   │   ├── mod.rs
+│   │   └── mouse.rs
+│   ├── main.rs
+│   ├── math
+│   │   ├── camera.rs
+│   │   ├── mod.rs
+│   │   └── transform.rs
+│   ├── memory
+│   │   ├── align.rs
+│   │   ├── arena.rs
+│   │   ├── cache.rs
+│   │   ├── frame.rs
+│   │   ├── gpu.rs
+│   │   ├── pool.rs
+│   │   └── tracking.rs
+│   ├── mod.rs
+│   ├── node.rs
+│   ├── platform
+│   │   ├── mod.rs
+│   │   ├── wayland.rs
+│   │   └── x11.rs
+│   ├── renderer
+│   │   ├── mod.rs
+│   │   ├── shader.rs
+│   │   ├── text.rs
+│   │   └── texture.rs
+│   ├── scene
+│   │   └── mod.rs
+│   ├── ui
+│   │   ├── bridge.rs
+│   │   ├── components
+│   │   │   ├── base.rs
+│   │   │   ├── memory_view.rs
+│   │   │   └── renderer.rs
+│   │   ├── integration.rs
+│   │   ├── mod.rs
+│   │   ├── src
+│   │   │   └── components
+│   │   │       └── EngineInterface.tsx
+│   │   └── text.rs
+│   ├── utils
+│   │   ├── logger.rs
+│   │   ├── math.rs
+│   │   └── mod.rs
+│   └── window
+│       ├── builder.rs
+│       ├── events.rs
+│       ├── manager.rs
+│       └── mod.rs
+├── tests
+│   ├── compositor_tests.rs
+│   ├── graphics_tests.rs
+│   ├── memory_tests.rs
+│   └── platform_tests.rs
+├── tools
+    ├── print_directory.rs
+    └── print_directory.txt

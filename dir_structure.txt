@@ -1,0 +1,93 @@
+rustgl
+├── Cargo.lock
+├── Cargo.toml
+├── LICENSE
+├── README.md
+├── assets
+│   ├── shaders
+│   └── textures
+├── benches
+│   └── renderer_bench.rs
+├── dir_structure.txt
+├── docs
+│   ├── API.md
+│   ├── ARCHITECTURE.md
+│   ├── COMPOSITOR_NOTES.md
+│   ├── EFFECTS.md
+│   └── PROJECT_NOTES.md
+├── examples
+│   ├── basic_window.rs
+│   ├── blur_effect.rs
+│   ├── custom_decoration.rs
+│   └── scene_graph.rs
+├── src
+│   ├── compositor
+│   │   ├── effects
+│   │   │   ├── animation.rs
+│   │   │   ├── blur.rs
+│   │   │   ├── mod.rs
+│   │   │   ├── shadow.rs
+│   │   │   └── transparency.rs
+│   │   ├── kwin.rs
+│   │   ├── managers
+│   │   │   ├── mod.rs
+│   │   │   └── window.rs
+│   │   ├── mod.rs
+│   │   ├── mutter.rs
+│   │   └── picom.rs
+│   ├── graph.rs
+│   ├── graphics
+│   │   ├── context.rs
+│   │   ├── mod.rs
+│   │   ├── renderer
+│   │   │   ├── mod.rs
+│   │   │   └── pipeline.rs
+│   │   ├── renderer.rs
+│   │   ├── shader
+│   │   │   ├── mod.rs
+│   │   │   └── program.rs
+│   │   └── shader.rs
+│   ├── gui
+│   │   ├── element.rs
+│   │   ├── mod.rs
+│   │   └── widgets
+│   │       ├── button.rs
+│   │       └── panel.rs
+│   ├── input
+│   │   ├── gamepad.rs
+│   │   ├── keyboard.rs
+│   │   ├── mod.rs
+│   │   └── mouse.rs
+│   ├── main.rs
+│   ├── math
+│   │   ├── camera.rs
+│   │   ├── mod.rs
+│   │   └── transform.rs
+│   ├── mod.rs
+│   ├── node.rs
+│   ├── platform
+│   │   ├── mod.rs
+│   │   ├── wayland.rs
+│   │   └── x11.rs
+│   ├── renderer
+│   │   ├── mod.rs
+│   │   ├── shader.rs
+│   │   ├── text.rs
+│   │   └── texture.rs
+│   ├── scene
+│   │   └── mod.rs
+│   ├── utils
+│   │   ├── logger.rs
+│   │   ├── math.rs
+│   │   └── mod.rs
+│   └── window
+│       ├── builder.rs
+│       ├── events.rs
+│       ├── manager.rs
+│       └── mod.rs
+├── tests
+│   ├── compositor_tests.rs
+│   ├── graphics_tests.rs
+│   └── platform_tests.rs
+├── tools
+    └── print_directory.rs

@@ -1,0 +1,876 @@
+--- File: command/mod.rs ---
+
+// Command buffer abstraction
+// src/graphics/command/mod.rs
+pub trait CommandBuffer {
+    fn begin(&mut self) -> Result<(), GraphicsError>;
+    fn end(&mut self) -> Result<(), GraphicsError>;
+    fn bind_pipeline(&mut self, pipeline: &impl Pipeline) -> Result<(), GraphicsError>;
+    fn bind_vertex_buffer(&mut self, buffer: &impl Buffer, offset: u64) -> Result<(), GraphicsError>;
+    fn draw(&mut self, vertex_count: u32, instance_count: u32) -> Result<(), GraphicsError>;
+    fn draw_indexed(&mut self, index_count: u32, instance_count: u32) -> Result<(), GraphicsError>;
+}
+
+---
+
+--- File: resources/mod.rs ---
+// Resource management
+// src/graphics/resources/mod.rs
+pub trait ResourceManager {
+    type Buffer;
+    type Texture;
+    type Shader;
+    type Pipeline;
+    
+    fn create_buffer(&mut self, desc: &BufferDesc) -> Result<Self::Buffer, GraphicsError>;
+    fn create_texture(&mut self, desc: &TextureDesc) -> Result<Self::Texture, GraphicsError>;
+    fn create_shader(&mut self, desc: &ShaderDesc) -> Result<Self::Shader, GraphicsError>;
+    fn create_pipeline(&mut self, desc: &PipelineDesc) -> Result<Self::Pipeline, GraphicsError>;
+    
+    fn destroy_buffer(&mut self, buffer: Self::Buffer);
+    fn destroy_texture(&mut self, texture: Self::Texture);
+    fn destroy_shader(&mut self, shader: Self::Shader);
+    fn destroy_pipeline(&mut self, pipeline: Self::Pipeline);
+}
+
+---
+
+--- File: context.rs ---
+
+---
+
+--- File: renderer.rs ---
+
+---
+
+--- File: mod.rs ---
+
+---
+
+--- File: shader.rs ---
+
+---
+
+--- File: shader/mod.rs ---
+
+---
+
+--- File: shader/program.rs ---
+
+---
+
+--- File: renderer/mod.rs ---
+
+// Backend-agnostic renderer
+// src/graphics/renderer/mod.rs
+pub struct Renderer<B: GraphicsBackend> {
+    backend: B,
+    resource_manager: Box<dyn ResourceManager>,
+    command_pool: CommandPool<B>,
+    current_frame: usize,
+}
+
+impl<B: GraphicsBackend> Renderer<B> {
+    pub fn new(backend: B) -> Result<Self, GraphicsError> {
+        // Initialize renderer with specific backend
+        Ok(Self {
+            backend,
+            resource_manager: Box::new(DefaultResourceManager::new()),
+            command_pool: CommandPool::new()?,
+            current_frame: 0,
+        })
+    }
+    
+    pub fn begin_frame(&mut self) -> Result<(), GraphicsError> {
+        let command_buffer = self.command_pool.get_current_buffer()?;
+        command_buffer.begin()?;
+        Ok(())
+    }
+    
+    pub fn end_frame(&mut self) -> Result<(), GraphicsError> {
+        let command_buffer = self.command_pool.get_current_buffer()?;
+        command_buffer.end()?;
+        self.current_frame += 1;
+        Ok(())
+    }
+}
+---
+
+--- File: renderer/pipeline.rs ---
+
+---
+
+--- File: buffer.rs ---
+// src/graphics/buffer.rs
+pub struct BufferManager<T: GraphicsMemoryManager> {
+    memory_manager: T,
+    buffer_allocations: HashMap<T::BufferHandle, BufferAllocation>,
+    staging_pool: StagingPool,
+}
+
+---
+
+--- File: core/mod.rs ---
+// src/graphics/core/mod.rs
+
+/// Trait defining the core graphics backend interface
+pub trait GraphicsBackend: Send + Sync {
+    type Buffer;
+    type Shader;
+    type Pipeline;
+    type CommandBuffer;
+    
+    fn create_buffer(&self, desc: BufferDesc) -> Result<Self::Buffer, GraphicsError>;
+    fn create_shader(&self, desc: ShaderDesc) -> Result<Self::Shader, GraphicsError>;
+    fn create_pipeline(&self, desc: PipelineDesc) -> Result<Self::Pipeline, GraphicsError>;
+    fn create_command_buffer(&self) -> Result<Self::CommandBuffer, GraphicsError>;
+}
+
+// Core types shared across all backends
+#[derive(Debug, Clone)]
+pub struct BufferDesc {
+    pub size: usize,
+    pub usage: BufferUsage,
+    pub memory_type: MemoryType,
+}
+
+#[derive(Debug, Clone)]
+pub struct ShaderDesc {
+    pub stage: ShaderStage,
+    pub source: ShaderSource,
+    pub entry_point: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PipelineDesc {
+    pub vertex_layout: VertexLayout,
+    pub shader_stages: Vec<ShaderStageDesc>,
+    pub rasterizer_state: RasterizerState,
+    pub blend_state: BlendState,
+    pub depth_stencil_state: DepthStencilState,
+}
+---
+
+--- File: backends/opengl/types.rs ---
+// src/graphics/backends/opengl/types.rs
+#[derive(Debug, Clone)]
+pub struct VertexAttribute {
+    location: u32,
+    format: AttributeFormat,
+    offset: usize,
+    divisor: u32,
+}
+
+#[derive(Debug, Clone)]
+pub enum AttributeFormat {
+    Float1,
+    Float2,
+    Float3,
+    Float4,
+    Int1,
+    Int2,
+    Int3,
+    Int4,
+    UInt1,
+    UInt2,
+    UInt3,
+    UInt4,
+}
+
+---
+
+--- File: backends/opengl/context.rs ---
+// src/graphics/backends/opengl/context.rs
+use gl;
+use std::sync::Arc;
+
+pub struct GLContext {
+    gl: Arc<gl::Gl>,
+    version: GLVersion,
+    features: GLFeatureSet,
+    state_cache: GLStateCache,
+}
+
+impl GLContext {
+    pub fn new(gl: gl::Gl) -> Result<Self, GraphicsError> {
+        let gl = Arc::new(gl);
+        let version = Self::detect_version(&gl)?;
+        let features = Self::detect_features(&gl)?;
+        
+        Ok(Self {
+            gl,
+            version,
+            features,
+            state_cache: GLStateCache::new(),
+        })
+    }
+    
+    fn detect_version(gl: &gl::Gl) -> Result<GLVersion, GraphicsError> {
+        unsafe {
+            let version = std::ffi::CStr::from_ptr(gl.GetString(gl::VERSION) as *const _)
+                .to_str()
+                .map_err(|_| GraphicsError::VersionDetectionFailed)?;
+            GLVersion::parse(version)
+        }
+    }
+    
+    fn detect_features(gl: &gl::Gl) -> Result<GLFeatureSet, GraphicsError> {
+        let mut features = GLFeatureSet::default();
+        unsafe {
+            let extensions = gl.GetString(gl::EXTENSIONS);
+            // Parse and populate features based on extensions
+        }
+        Ok(features)
+    }
+}
+
+---
+
+--- File: backends/opengl/mod.rs ---
+// OpenGL implementation
+// src/graphics/backends/opengl/mod.rs
+pub struct OpenGLBackend {
+    context: GLContext,
+    state_cache: GLStateCache,
+    resource_tracker: ResourceTracker,
+}
+
+impl GraphicsBackend for OpenGLBackend {
+    type Buffer = GLBuffer;
+    type Shader = GLShader;
+    type Pipeline = GLPipeline;
+    type CommandBuffer = GLCommandBuffer;
+    
+    fn create_buffer(&self, desc: BufferDesc) -> Result<GLBuffer, GraphicsError> {
+        let mut buffer = GLBuffer::new(&self.context);
+        buffer.allocate(desc.size, desc.usage)?;
+        Ok(buffer)
+    }
+    
+    fn create_shader(&self, desc: ShaderDesc) -> Result<GLShader, GraphicsError> {
+        let shader = GLShader::new(&self.context, desc.stage)?;
+        shader.compile(desc.source)?;
+        Ok(shader)
+    }
+    
+    fn create_pipeline(&self, desc: PipelineDesc) -> Result<GLPipeline, GraphicsError> {
+        let pipeline = GLPipeline::new(&self.context);
+        pipeline.set_vertex_layout(&desc.vertex_layout)?;
+        pipeline.set_shader_stages(&desc.shader_stages)?;
+        pipeline.set_rasterizer_state(&desc.rasterizer_state)?;
+        pipeline.set_blend_state(&desc.blend_state)?;
+        pipeline.set_depth_stencil_state(&desc.depth_stencil_state)?;
+        Ok(pipeline)
+    }
+}
+---
+
+--- File: backends/opengl/shader.rs ---
+// src/graphics/backends/opengl/shader.rs
+pub struct GLShader {
+    gl: Arc<gl::Gl>,
+    handle: gl::types::GLuint,
+    stage: ShaderStage,
+}
+
+impl GLShader {
+    pub fn new(context: &GLContext, stage: ShaderStage) -> Result<Self, GraphicsError> {
+        let handle = unsafe {
+            context.gl.CreateShader(stage.to_gl_enum())
+        };
+        
+        Ok(Self {
+            gl: Arc::clone(&context.gl),
+            handle,
+            stage,
+        })
+    }
+    
+    pub fn compile(&self, source: &str) -> Result<(), GraphicsError> {
+        unsafe {
+            let source = std::ffi::CString::new(source)
+                .map_err(|_| GraphicsError::ShaderCompilationFailed)?;
+            
+            self.gl.ShaderSource(
+                self.handle,
+                1,
+                &source.as_ptr(),
+                std::ptr::null(),
+            );
+            
+            self.gl.CompileShader(self.handle);
+            
+            // Check compilation status
+            let mut success = 0;
+            self.gl.GetShaderiv(self.handle, gl::COMPILE_STATUS, &mut success);
+            
+            if success == 0 {
+                let mut log_length = 0;
+                self.gl.GetShaderiv(self.handle, gl::INFO_LOG_LENGTH, &mut log_length);
+                
+                let mut log = Vec::with_capacity(log_length as usize);
+                self.gl.GetShaderInfoLog(
+                    self.handle,
+                    log_length,
+                    std::ptr::null_mut(),
+                    log.as_mut_ptr() as *mut gl::types::GLchar,
+                );
+                
+                log.set_len(log_length as usize);
+                let error_message = String::from_utf8_lossy(&log);
+                return Err(GraphicsError::ShaderCompilationFailed);
+            }
+        }
+        
+        Ok(())
+    }
+}
+
+---
+
+--- File: backends/opengl/pipeline.rs ---
+
+// src/graphics/backends/opengl/pipeline.rs
+pub struct GLPipeline {
+    gl: Arc<gl::Gl>,
+    program: gl::types::GLuint,
+    vertex_layout: VertexLayout,
+    state: PipelineState,
+    uniforms: HashMap<String, UniformLocation>,
+    uniform_blocks: HashMap<String, UniformBlockInfo>,
+    fast_uniforms: FastUniformCache,
+}
+
+impl GLPipeline {
+    pub fn new(context: &GLContext) -> Result<Self, GraphicsError> {
+        let program = unsafe { context.gl.CreateProgram() };
+        
+        Ok(Self {
+            gl: Arc::clone(&context.gl),
+            program,
+            vertex_layout: VertexLayout::default(),
+            state: PipelineState::default(),
+            uniforms: HashMap::new(),
+            uniform_blocks: HashMap::new(),
+            fast_uniforms: FastUniformCache::default(),
+        })
+    }
+
+    pub fn reflect_uniforms(&mut self) -> Result<(), GraphicsError> {
+        unsafe {
+            let mut count = 0;
+            self.gl.GetProgramiv(self.program, gl::ACTIVE_UNIFORMS, &mut count);
+
+            for i in 0..count {
+                let mut name = [0u8; 256];
+                let mut length = 0;
+                let mut size = 0;
+                let mut type_ = 0;
+
+                self.gl.GetActiveUniform(
+                    self.program,
+                    i as gl::types::GLuint,
+                    256,
+                    &mut length,
+                    &mut size,
+                    &mut type_,
+                    name.as_mut_ptr() as *mut gl::types::GLchar,
+                );
+
+                let name = std::str::from_utf8(&name[..length as usize])
+                    .map_err(|_| GraphicsError::UniformReflectionFailed)?;
+                
+                let location = self.gl.GetUniformLocation(self.program, name.as_ptr() as *const _);
+                if location >= 0 {
+                    self.uniforms.insert(name.to_string(), UniformLocation(location));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn reflect_uniform_blocks(&mut self) -> Result<(), GraphicsError> {
+        unsafe {
+            let mut count = 0;
+            self.gl.GetProgramiv(self.program, gl::ACTIVE_UNIFORM_BLOCKS, &mut count);
+
+            for i in 0..count {
+                let mut name = [0u8; 256];
+                let mut length = 0;
+                let mut size = 0;
+
+                self.gl.GetActiveUniformBlockName(
+                    self.program,
+                    i as gl::types::GLuint,
+                    256,
+                    &mut length,
+                    name.as_mut_ptr() as *mut gl::types::GLchar,
+                );
+
+                self.gl.GetActiveUniformBlockiv(
+                    self.program,
+                    i as gl::types::GLuint,
+                    gl::UNIFORM_BLOCK_DATA_SIZE,
+                    &mut size,
+                );
+
+                let name = std::str::from_utf8(&name[..length as usize])
+                    .map_err(|_| GraphicsError::UniformReflectionFailed)?;
+
+                self.uniform_blocks.insert(name.to_string(), UniformBlockInfo {
+                    index: i as gl::types::GLuint,
+                    size: size as usize,
+                    binding: i as u32, // Default binding point
+                });
+            }
+        }
+        Ok(())
+    }
+
+    // Push-constant-like functionality using uniform buffers
+    pub fn push_constants<T: Copy>(&mut self, data: &T, offset: usize) -> Result<(), GraphicsError> {
+        let size = std::mem::size_of::<T>();
+        if self.fast_uniforms.buffer.len() < offset + size {
+            self.fast_uniforms.buffer.resize(offset + size, 0);
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                data as *const T as *const u8,
+                self.fast_uniforms.buffer.as_mut_ptr().add(offset),
+                size,
+            );
+        }
+
+        // Update uniforms immediately for push-constant-like behavior
+        self.update_fast_uniforms()?;
+        Ok(())
+    }
+
+    fn update_fast_uniforms(&self) -> Result<(), GraphicsError> {
+        unsafe {
+            // Use a dedicated uniform buffer for fast updates
+            // This mimics push constant behavior while using UBOs under the hood
+            self.gl.BufferSubData(
+                gl::UNIFORM_BUFFER,
+                0,
+                self.fast_uniforms.buffer.len() as gl::types::GLsizeiptr,
+                self.fast_uniforms.buffer.as_ptr() as *const _,
+            );
+        }
+        Ok(())
+    }
+}
+
+---
+
+--- File: backends/opengl/buffer.rs ---
+// src/graphics/backends/opengl/buffer.rs
+pub struct GLBuffer {
+    gl: Arc<gl::Gl>,
+    handle: gl::types::GLuint,
+    size: usize,
+    usage: BufferUsage,
+    target: gl::types::GLenum,
+    stride: usize,
+    attributes: Vec<VertexAttribute>,
+}
+
+impl GLBuffer {
+    pub fn new(context: &GLContext) -> Result<Self, GraphicsError> {
+        let mut handle = 0;
+        unsafe {
+            context.gl.GenBuffers(1, &mut handle);
+        }
+        
+        Ok(Self {
+            gl: Arc::clone(&context.gl),
+            handle,
+            size: 0,
+            usage: BufferUsage::default(),
+            target: gl::ARRAY_BUFFER,
+            stride: 0,
+            attributes: Vec::new(),
+        })
+    }
+
+    pub fn set_vertex_layout(&mut self, layout: &VertexLayout) -> Result<(), GraphicsError> {
+        self.stride = layout.stride;
+        self.attributes = layout.attributes.clone();
+        Ok(())
+    }
+
+    pub fn bind_vertex_attributes(&self, vao: gl::types::GLuint) {
+        unsafe {
+            self.gl.BindVertexArray(vao);
+            self.gl.BindBuffer(gl::ARRAY_BUFFER, self.handle);
+
+            for attr in &self.attributes {
+                let (size, type_, normalized) = attr.format.to_gl_params();
+                
+                self.gl.EnableVertexAttribArray(attr.location);
+                self.gl.VertexAttribPointer(
+                    attr.location,
+                    size,
+                    type_,
+                    normalized,
+                    self.stride as gl::types::GLsizei,
+                    attr.offset as *const _,
+                );
+                
+                if attr.divisor > 0 {
+                    self.gl.VertexAttribDivisor(attr.location, attr.divisor);
+                }
+            }
+        }
+    }
+}
+
+---
+
+--- File: backends/opengl/backend.rs ---
+// src/graphics/backends/opengl/backend.rs
+use parking_lot::RwLock;
+use std::sync::Arc;
+
+pub struct OpenGLBackend {
+    context: GLContext,
+    state_cache: StateCache,
+    command_pool: CommandPool,
+    persistent_mappings: PersistentBufferCache,
+    uniform_buffer_pool: UniformBufferPool,
+}
+
+// Efficient state caching to minimize redundant state changes
+#[derive(Default)]
+struct StateCache {
+    active_program: gl::types::GLuint,
+    active_vao: gl::types::GLuint,
+    active_buffers: [gl::types::GLuint; 8], // Different buffer targets
+    blend_enabled: bool,
+    depth_test_enabled: bool,
+    viewport: [i32; 4],
+}
+
+// Pool for uniform buffer objects to minimize allocations
+struct UniformBufferPool {
+    buffers: Vec<UniformBuffer>,
+    current_frame: usize,
+    frames_in_flight: usize,
+}
+
+impl UniformBufferPool {
+    pub fn new(frames_in_flight: usize) -> Self {
+        Self {
+            buffers: Vec::new(),
+            current_frame: 0,
+            frames_in_flight,
+        }
+    }
+
+    pub fn allocate(&mut self, size: usize) -> Option<&mut UniformBuffer> {
+        let frame_offset = self.current_frame * self.frames_in_flight;
+        
+        // Find existing buffer or create new one
+        for buffer in &mut self.buffers[frame_offset..][..self.frames_in_flight] {
+            if buffer.can_fit(size) {
+                return Some(buffer);
+            }
+        }
+        
+        // Create new buffer if none found
+        let mut buffer = UniformBuffer::new(size)?;
+        self.buffers.push(buffer);
+        self.buffers.last_mut()
+    }
+
+    pub fn next_frame(&mut self) {
+        self.current_frame = (self.current_frame + 1) % self.frames_in_flight;
+    }
+}
+
+// Persistent buffer mapping for faster updates
+struct PersistentBufferCache {
+    vertex_buffers: Vec<MappedBuffer>,
+    index_buffers: Vec<MappedBuffer>,
+}
+
+struct MappedBuffer {
+    handle: gl::types::GLuint,
+    size: usize,
+    ptr: *mut u8,
+}
+
+impl OpenGLBackend {
+    pub fn new(context: GLContext) -> Self {
+        Self {
+            context,
+            state_cache: StateCache::default(),
+            command_pool: CommandPool::new(),
+            persistent_mappings: PersistentBufferCache::new(),
+            uniform_buffer_pool: UniformBufferPool::new(3), // Triple buffering
+        }
+    }
+
+    // Batched state changes
+    fn set_pipeline_state(&mut self, state: &PipelineState) {
+        // Only update states that have changed
+        if state.program != self.state_cache.active_program {
+            unsafe {
+                self.context.gl.UseProgram(state.program);
+                self.state_cache.active_program = state.program;
+            }
+        }
+
+        if state.blend_enabled != self.state_cache.blend_enabled {
+            unsafe {
+                if state.blend_enabled {
+                    self.context.gl.Enable(gl::BLEND);
+                } else {
+                    self.context.gl.Disable(gl::BLEND);
+                }
+                self.state_cache.blend_enabled = state.blend_enabled;
+            }
+        }
+
+        // Similar checks for other states...
+    }
+
+    // SIMD-accelerated buffer updates when available
+    #[cfg(target_feature = "avx2")]
+    unsafe fn update_buffer_simd(&self, buffer: &mut MappedBuffer, data: &[u8]) {
+        use std::arch::x86_64::*;
+        
+        let src = data.as_ptr() as *const __m256i;
+        let dst = buffer.ptr as *mut __m256i;
+        let chunks = data.len() / 32;
+        
+        for i in 0..chunks {
+            let v = _mm256_loadu_si256(src.add(i));
+            _mm256_stream_si256(dst.add(i), v);
+        }
+        
+        // Handle remaining bytes
+        let remainder = data.len() % 32;
+        if remainder > 0 {
+            std::ptr::copy_nonoverlapping(
+                data.as_ptr().add(data.len() - remainder),
+                buffer.ptr.add(data.len() - remainder),
+                remainder
+            );
+        }
+        
+        _mm_sfence();
+    }
+
+    // Command buffer submission with instancing support
+    pub fn submit_commands(&mut self, cmd_buffer: &CommandBuffer) {
+        for cmd in &cmd_buffer.commands {
+            match cmd {
+                Command::Draw { vertex_count, instance_count, .. } => {
+                    if *instance_count > 1 {
+                        unsafe {
+                            self.context.gl.DrawArraysInstanced(
+                                gl::TRIANGLES,
+                                0,
+                                *vertex_count as i32,
+                                *instance_count as i32
+                            );
+                        }
+                    } else {
+                        unsafe {
+                            self.context.gl.DrawArrays(
+                                gl::TRIANGLES,
+                                0,
+                                *vertex_count as i32
+                            );
+                        }
+                    }
+                }
+                // Handle other commands...
+            }
+        }
+    }
+
+    // Efficient texture uploads using PBO
+    pub fn upload_texture_data(&mut self, texture: &mut GLTexture, data: &[u8]) {
+        let pbo = self.get_staging_pbo(data.len());
+        
+        unsafe {
+            // Copy data to PBO
+            self.context.gl.BindBuffer(gl::PIXEL_UNPACK_BUFFER, pbo);
+            self.context.gl.BufferSubData(
+                gl::PIXEL_UNPACK_BUFFER,
+                0,
+                data.len() as isize,
+                data.as_ptr() as *const _
+            );
+            
+            // Transfer from PBO to texture
+            self.context.gl.BindTexture(gl::TEXTURE_2D, texture.handle);
+            self.context.gl.TexSubImage2D(
+                gl::TEXTURE_2D,
+                0,
+                0,
+                0,
+                texture.width as i32,
+                texture.height as i32,
+                texture.format,
+                texture.type_,
+                std::ptr::null()
+            );
+        }
+    }
+}
+
+// Vertex Array Object caching
+struct VAOCache {
+    cache: HashMap<VertexLayoutHash, gl::types::GLuint>,
+}
+
+impl VAOCache {
+    pub fn get_or_create(&mut self, layout: &VertexLayout) -> gl::types::GLuint {
+        let hash = layout.hash();
+        if let Some(&vao) = self.cache.get(&hash) {
+            return vao;
+        }
+
+        let vao = unsafe {
+            let mut vao = 0;
+            self.context.gl.GenVertexArrays(1, &mut vao);
+            self.context.gl.BindVertexArray(vao);
+            // Set up vertex attributes...
+            vao
+        };
+
+        self.cache.insert(hash, vao);
+        vao
+    }
+}
+---
+
+--- File: backends/opengl/uniform.rs ---
+// src/graphics/backends/opengl/uniform.rs
+#[derive(Debug)]
+pub struct UniformLocation(gl::types::GLint);
+
+#[derive(Debug)]
+pub struct UniformBlockInfo {
+    index: gl::types::GLuint,
+    size: usize,
+    binding: u32,
+}
+
+#[derive(Default)]
+pub struct FastUniformCache {
+    vec4_cache: HashMap<u32, [f32; 4]>,
+    mat4_cache: HashMap<u32, [f32; 16]>,
+    buffer: Vec<u8>, // For staging push-constant-like data
+}
+---
+
+--- File: backends/opengl/memory.rs ---
+// src/graphics/opengl/memory.rs
+pub struct OpenGLMemoryManager {
+    buffer_objects: HashMap<BufferHandle, GLuint>,
+    texture_objects: HashMap<TextureHandle, GLuint>,
+    debug_layer: Option<GLDebugLayer>,
+}
+
+impl GraphicsMemoryManager for OpenGLMemoryManager {
+    type BufferHandle = BufferHandle;
+    type TextureHandle = TextureHandle;
+    
+    fn create_buffer(&mut self, desc: BufferDesc) -> Result<BufferHandle, Self::Error> {
+        // OpenGL specific buffer creation
+    }
+}
+---
+
+--- File: backends/vulkan/memory.rs ---
+// src/graphics/vulkan/memory.rs
+pub struct VulkanMemoryManager {
+    allocator: vk::DeviceMemory,
+    memory_types: Vec<vk::MemoryType>,
+    buffer_allocations: HashMap<BufferHandle, VkBufferAllocation>,
+    texture_allocations: HashMap<TextureHandle, VkTextureAllocation>,
+}
+
+impl GraphicsMemoryManager for VulkanMemoryManager {
+    type BufferHandle = BufferHandle;
+    type TextureHandle = TextureHandle;
+    
+    fn create_buffer(&mut self, desc: BufferDesc) -> Result<BufferHandle, Self::Error> {
+        // Vulkan specific buffer creation
+    }
+}
+---
+
+--- File: texture.rs ---
+// src/graphics/texture.rs
+pub struct TextureManager<T: GraphicsMemoryManager> {
+    memory_manager: T,
+    texture_allocations: HashMap<T::TextureHandle, TextureAllocation>,
+    mip_generator: MipGenerator,
+}
+---
+
+--- File: memory.rs ---
+// src/graphics/memory.rs
+pub enum GraphicsAPI {
+    OpenGL,
+    Vulkan,
+}
+
+pub struct GraphicsMemoryConfig {
+    api: GraphicsAPI,
+    device_local_size: usize,
+    host_visible_size: usize,
+    staging_buffer_size: usize,
+}
+
+// Graphics memory types
+#[derive(Debug, Clone, Copy)]
+pub enum MemoryType {
+    DeviceLocal,    // GPU-only access
+    HostVisible,    // CPU-visible
+    HostCoherent,   // No explicit flush needed
+    HostCached,     // Cached memory access
+}
+
+// Memory allocation descriptor
+pub struct MemoryDesc {
+    size: usize,
+    alignment: usize,
+    memory_type: MemoryType,
+    usage: MemoryUsage,
+}
+---
+
+--- File: pipeline/state.rs ---
+
+// Pipeline state management
+// src/graphics/pipeline/state.rs
+#[derive(Debug, Clone)]
+pub struct PipelineState {
+    vertex_layout: VertexLayout,
+    rasterizer_state: RasterizerState,
+    blend_state: BlendState,
+    depth_stencil_state: DepthStencilState,
+    viewport: Viewport,
+    scissor: ScissorRect,
+}
+
+impl PipelineState {
+    pub fn builder() -> PipelineStateBuilder {
+        PipelineStateBuilder::new()
+    }
+    
+    pub fn apply<B: GraphicsBackend>(&self, backend: &B) -> Result<(), GraphicsError> {
+        // Apply state changes through backend-specific calls
+        Ok(())
+    }
+}
+
+---
+
